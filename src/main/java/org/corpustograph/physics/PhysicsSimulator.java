@@ -12,6 +12,7 @@ public class PhysicsSimulator {
     private final Random random;
     private final double damping;
     private final double repulsion;
+    private List<SpringEdge> activeEdges;
 
     public PhysicsSimulator(GraphModel graph) {
         this(graph, 0.98, 700.0, 42L);
@@ -22,7 +23,12 @@ public class PhysicsSimulator {
         this.damping = damping;
         this.repulsion = repulsion;
         this.random = new Random(seed);
+        this.activeEdges = graph.edges();
         initializePositions();
+    }
+
+    public void setActiveEdges(List<SpringEdge> edges) {
+        this.activeEdges = edges;
     }
 
     private void initializePositions() {
@@ -56,7 +62,7 @@ public class PhysicsSimulator {
             }
         }
 
-        for (SpringEdge edge : graph.edges()) {
+        for (SpringEdge edge : activeEdges) {
             DocumentNode a = nodes.get(edge.from());
             DocumentNode b = nodes.get(edge.to());
             double dx = b.getX() - a.getX();

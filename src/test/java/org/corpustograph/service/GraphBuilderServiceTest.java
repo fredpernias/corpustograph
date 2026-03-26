@@ -18,8 +18,8 @@ class GraphBuilderServiceTest {
         Path docsDir = resourcePath("e2e/docs");
 
         GraphModel graph = service.fromDirectory(docsDir, SimilarityModel.BM25);
-        assertEquals(3, graph.nodes().size());
-        assertEquals(3, graph.edges().size());
+        assertEquals(5, graph.nodes().size());  // 3 racine + 2 dans subdir/
+        assertEquals(10, graph.edges().size()); // 5*(5-1)/2
 
         assertFalse(graph.nodes().get(0).getSummary().isBlank());
 
