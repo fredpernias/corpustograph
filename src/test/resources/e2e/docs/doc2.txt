@@ -1,0 +1,1 @@
+BM25 calcule la similarite entre documents dans un corpus textuel.

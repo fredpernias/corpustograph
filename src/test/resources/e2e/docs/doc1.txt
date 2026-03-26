@@ -1,0 +1,1 @@
+Java swing interface graphique pour visualiser un corpus et animer un graphe.
