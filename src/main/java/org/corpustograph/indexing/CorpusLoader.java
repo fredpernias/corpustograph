@@ -14,7 +14,7 @@ public class CorpusLoader {
     private final SimpleSummarizer summarizer = new SimpleSummarizer();
 
     public List<DocumentNode> load(Path directory) throws IOException {
-        List<Path> files = Files.list(directory)
+        List<Path> files = Files.walk(directory)
                 .filter(Files::isRegularFile)
                 .filter(p -> p.toString().endsWith(".txt") || p.toString().endsWith(".md"))
                 .sorted(Comparator.comparing(Path::toString))

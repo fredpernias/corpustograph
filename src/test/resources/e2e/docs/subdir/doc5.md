@@ -1,0 +1,1 @@
+Modèle de langage pour la classification automatique de textes et l'extraction d'informations.
