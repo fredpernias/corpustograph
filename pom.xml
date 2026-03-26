@@ -47,7 +47,8 @@
                 <artifactId>exec-maven-plugin</artifactId>
                 <version>3.4.1</version>
                 <configuration>
-                    <mainClass>org.corpustograph.ui.CorpusToGraphApp</mainClass>
+                    <executable>java</executable>
+                    <commandlineArgs>-Xmx4g -Xss16m -classpath %classpath org.corpustograph.ui.CorpusToGraphApp ${exec.args}</commandlineArgs>
                 </configuration>
             </plugin>
         </plugins>

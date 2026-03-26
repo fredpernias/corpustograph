@@ -12,13 +12,20 @@ public class SimilarityEngine {
         int n = docs.size();
         double[][] matrix = new double[n][n];
 
-        List<List<String>> tokens = docs.stream().map(d -> tokenizer.tokenize(d.getContent())).toList();
+        List<List<String>> tokens = docs.stream()
+                .map(d -> tokenizer.tokenize(d.getContent()))
+                .toList();
+
+        // Précalcul partagé : df (document frequency) et avgdl
+        Map<String, Integer> df = computeDf(tokens);
+        double avgdl = tokens.stream().mapToInt(List::size).average().orElse(1.0);
+
         for (int i = 0; i < n; i++) {
             matrix[i][i] = 1.0;
             for (int j = i + 1; j < n; j++) {
                 double score = switch (model) {
-                    case BM25 -> bm25Symmetric(tokens, i, j);
-                    case TF_IDF -> tfidfCosine(tokens, i, j);
+                    case BM25    -> bm25Symmetric(tokens, i, j, df, avgdl, n);
+                    case TF_IDF  -> tfidfCosine(tokens, i, j, df, n);
                 };
                 matrix[i][j] = score;
                 matrix[j][i] = score;
@@ -27,57 +34,61 @@ public class SimilarityEngine {
         return normalize(matrix);
     }
 
-    private double bm25Symmetric(List<List<String>> tokenizedDocs, int a, int b) {
-        return (bm25(tokenizedDocs.get(a), tokenizedDocs, b) + bm25(tokenizedDocs.get(b), tokenizedDocs, a)) / 2.0;
+    /** Nombre de documents contenant chaque terme. */
+    private Map<String, Integer> computeDf(List<List<String>> tokenizedDocs) {
+        Map<String, Integer> df = new HashMap<>();
+        for (List<String> doc : tokenizedDocs) {
+            for (String term : new HashSet<>(doc)) {
+                df.merge(term, 1, Integer::sum);
+            }
+        }
+        return df;
     }
 
-    private double bm25(List<String> query, List<List<String>> docs, int targetIdx) {
+    private double bm25Symmetric(List<List<String>> docs, int a, int b,
+                                  Map<String, Integer> df, double avgdl, int N) {
+        return (bm25(docs.get(a), docs.get(b), df, avgdl, N)
+              + bm25(docs.get(b), docs.get(a), df, avgdl, N)) / 2.0;
+    }
+
+    private double bm25(List<String> query, List<String> doc,
+                        Map<String, Integer> df, double avgdl, int N) {
         final double k1 = 1.2;
-        final double b = 0.75;
-        List<String> doc = docs.get(targetIdx);
+        final double b  = 0.75;
 
         Map<String, Long> tf = frequencies(doc);
         Map<String, Long> qf = frequencies(query);
-        double avgdl = docs.stream().mapToInt(List::size).average().orElse(1.0);
-        int N = docs.size();
         int dl = doc.size();
 
         double score = 0.0;
         for (String term : qf.keySet()) {
-            long ni = docs.stream().filter(d -> d.contains(term)).count();
+            int ni = df.getOrDefault(term, 0);
             if (ni == 0) continue;
             double idf = Math.log(1 + (N - ni + 0.5) / (ni + 0.5));
             double f = tf.getOrDefault(term, 0L);
-            double numerator = f * (k1 + 1);
+            double numerator   = f * (k1 + 1);
             double denominator = f + k1 * (1 - b + b * (dl / avgdl));
-            if (denominator > 0) {
-                score += idf * (numerator / denominator);
-            }
+            if (denominator > 0) score += idf * (numerator / denominator);
         }
         return score;
     }
 
-    private double tfidfCosine(List<List<String>> docs, int a, int b) {
+    private double tfidfCosine(List<List<String>> docs, int a, int b,
+                               Map<String, Integer> df, int N) {
         Map<String, Long> fa = frequencies(docs.get(a));
         Map<String, Long> fb = frequencies(docs.get(b));
 
-        Set<String> vocab = new HashSet<>();
-        vocab.addAll(fa.keySet());
+        Set<String> vocab = new HashSet<>(fa.keySet());
         vocab.addAll(fb.keySet());
 
-        int N = docs.size();
-        double dot = 0;
-        double na = 0;
-        double nb = 0;
-
+        double dot = 0, na = 0, nb = 0;
         for (String term : vocab) {
-            long df = docs.stream().filter(d -> d.contains(term)).count();
-            double idf = Math.log(1 + (double) N / (1 + df));
+            double idf = Math.log(1 + (double) N / (1 + df.getOrDefault(term, 0)));
             double wa = fa.getOrDefault(term, 0L) * idf;
             double wb = fb.getOrDefault(term, 0L) * idf;
             dot += wa * wb;
-            na += wa * wa;
-            nb += wb * wb;
+            na  += wa * wa;
+            nb  += wb * wb;
         }
         if (na == 0 || nb == 0) return 0;
         return dot / (Math.sqrt(na) * Math.sqrt(nb));
@@ -85,27 +96,19 @@ public class SimilarityEngine {
 
     private Map<String, Long> frequencies(List<String> tokens) {
         Map<String, Long> map = new HashMap<>();
-        for (String t : tokens) {
-            map.put(t, map.getOrDefault(t, 0L) + 1);
-        }
+        for (String t : tokens) map.merge(t, 1L, Long::sum);
         return map;
     }
 
     private double[][] normalize(double[][] matrix) {
         double max = 0;
-        for (double[] row : matrix) {
-            for (double v : row) {
-                max = Math.max(max, v);
-            }
-        }
+        for (double[] row : matrix) for (double v : row) max = Math.max(max, v);
         if (max <= 0) return matrix;
         int n = matrix.length;
         double[][] out = new double[n][n];
-        for (int i = 0; i < n; i++) {
-            for (int j = 0; j < n; j++) {
+        for (int i = 0; i < n; i++)
+            for (int j = 0; j < n; j++)
                 out[i][j] = matrix[i][j] / max;
-            }
-        }
         return out;
     }
 }

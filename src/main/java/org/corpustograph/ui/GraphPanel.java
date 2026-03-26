@@ -14,7 +14,7 @@ import java.util.List;
 import java.util.function.Consumer;
 
 public class GraphPanel extends JPanel {
-    private static final int NODE_RADIUS = 10;
+    private static final int NODE_RADIUS = 6;
 
     private GraphModel graph;
     private PhysicsSimulator simulator;

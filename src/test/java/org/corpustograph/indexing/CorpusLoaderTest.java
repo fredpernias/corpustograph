@@ -14,7 +14,7 @@ class CorpusLoaderTest {
     @Test
     void loadRecursivelyFindsFilesInSubdirectories() throws Exception {
         Path docsDir = resourcePath("e2e/docs");
-        List<DocumentNode> nodes = new CorpusLoader().load(docsDir);
+        List<DocumentNode> nodes = new CorpusLoader().load(docsDir, Integer.MAX_VALUE).docs();
 
         // 3 fichiers racine + 2 fichiers dans subdir
         assertEquals(5, nodes.size());
@@ -27,7 +27,7 @@ class CorpusLoaderTest {
     @Test
     void loadIgnoresNonTextFiles() throws Exception {
         Path docsDir = resourcePath("e2e/docs");
-        List<DocumentNode> nodes = new CorpusLoader().load(docsDir);
+        List<DocumentNode> nodes = new CorpusLoader().load(docsDir, Integer.MAX_VALUE).docs();
 
         nodes.forEach(n -> {
             String t = n.getTitle();

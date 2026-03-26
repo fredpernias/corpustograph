@@ -9,6 +9,7 @@ import java.util.*;
 
 public class CorpusLoader {
     private static final Set<String> EXCLUDED_DIRS = Set.of("target", ".git", "node_modules", ".idea", "__pycache__");
+    private static final long MAX_FILE_BYTES = 5 * 1024 * 1024; // 5 Mo
 
     private static final DocumentReader PLAIN = new PlainTextReader();
     private static final DocumentReader WORD  = new WordDocumentReader();
@@ -37,32 +38,47 @@ public class CorpusLoader {
             Map.entry(".docx",       WORD)
     );
 
+    public record LoadResult(List<DocumentNode> docs, int skipped) {}
+
     private final SimpleSummarizer summarizer = new SimpleSummarizer();
 
-    public List<DocumentNode> load(Path directory) throws IOException {
-        List<Path> files = Files.walk(directory)
+    public LoadResult load(Path directory, int maxDocs) throws IOException {
+        List<DocumentNode> nodes = new ArrayList<>();
+        int skipped = 0;
+        int id = 0;
+
+        Iterable<Path> files = Files.walk(directory)
                 .filter(Files::isRegularFile)
                 .filter(p -> !isExcluded(directory, p))
                 .filter(p -> READERS.containsKey(extension(p)))
+                .filter(p -> fileSize(p) <= MAX_FILE_BYTES)
                 .sorted(Comparator.comparing(Path::toString))
-                .toList();
+                ::iterator;
 
-        List<DocumentNode> nodes = new ArrayList<>();
-        for (int i = 0; i < files.size(); i++) {
-            Path path = files.get(i);
-            DocumentReader reader = READERS.get(extension(path));
-            String content = reader.read(path);
-            double mass = Math.max(1.0, Math.sqrt(Math.max(1, content.length())) / 3.0);
-            nodes.add(new DocumentNode(
-                    i,
-                    path.getFileName().toString(),
-                    content,
-                    summarizer.summarize(content, 20),
-                    path,
-                    mass
-            ));
+        for (Path path : files) {
+            if (nodes.size() >= maxDocs) break;
+            try {
+                DocumentReader reader = READERS.get(extension(path));
+                String content = reader.read(path);
+                double mass = Math.max(1.0, Math.sqrt(Math.max(1, content.length())) / 3.0);
+                nodes.add(new DocumentNode(
+                        id++,
+                        path.getFileName().toString(),
+                        content,
+                        summarizer.summarize(content, 20),
+                        path,
+                        mass
+                ));
+            } catch (Throwable e) {
+                skipped++;
+                System.err.println("Ignoré (erreur de lecture): " + path + " — " + e.getMessage());
+            }
         }
-        return nodes;
+        return new LoadResult(nodes, skipped);
+    }
+
+    private static long fileSize(Path path) {
+        try { return Files.size(path); } catch (IOException e) { return Long.MAX_VALUE; }
     }
 
     private static boolean isExcluded(Path root, Path path) {
